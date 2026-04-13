@@ -1,112 +1,112 @@
+import streamlit as st
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import os
+import time
 
-# --- 1. CONFIGURACIÓN ---
-# Parámetros para la arquitectura de la red
-INPUT_SIZE = 3      # Ejemplo: 3 características de entrada (x1, x2, x3)
-HIDDEN_SIZE = 16    # Número de neuronas en la capa oculta
-OUTPUT_SIZE = 1     # Ejemplo: 1 valor de salida (predicción)
-
-# Parámetros de entrenamiento
-LEARNING_RATE = 0.01
-EPOCHS = 1000       # Cuántas veces la red verá todo el conjunto de datos
-MODEL_NAME = "modelo_ia_base.pth"
-
-
-# --- 2. DEFINICIÓN DE LA ARQUITECTURA (La IA) ---
+# --- 1. ARQUITECTURA DE LA IA ---
 class RedNeuronal(nn.Module):
-    """
-    Define una Red Neuronal Feedforward simple con una capa oculta.
-    Esta estructura es capaz de aprender patrones no lineales complejos.
-    """
-    def __init__(self, entrada_dim, oculto_dim, salida_dim):
+    def __init__(self, entrada_dim=3, oculto_dim=16, salida_dim=1):
         super(RedNeuronal, self).__init__()
-        # Capa 1: Entrada -> Oculta
         self.capa1 = nn.Linear(entrada_dim, oculto_dim)
-        # Función de activación: ReLU (introduce no linealidad)
         self.relu = nn.ReLU()
-        # Capa 2: Oculta -> Salida
         self.capa2 = nn.Linear(oculto_dim, salida_dim)
     
     def forward(self, x):
-        """Define cómo fluyen los datos a través de las capas."""
         x = self.capa1(x)
         x = self.relu(x)
         x = self.capa2(x)
         return x
 
-
-# --- 3. PREPARACIÓN DE DATOS (EJEMPLO) ---
-def generar_datos_ejemplo():
-    """
-    Crea datos sintéticos para entrenamiento.
-    En un caso real, aquí cargarías tus archivos CSV, imágenes, etc.
-    """
-    # X: Entradas (3 características por ejemplo), 100 ejemplos
-    X = torch.randn(100, INPUT_SIZE)
-    # y: Salidas deseadas (objetivo)
-    # Definimos una relación simple para que la red pueda aprender: y = sum(x) + ruido
-    y = X.sum(dim=1, keepdim=True) + torch.randn(100, 1) * 0.1
-    return X, y
-
-
-# --- 4. FUNCIÓN DE ENTRENAMIENTO ---
-def entrenar():
-    print("--- Iniciando entrenamiento de la IA ---")
-    
-    # Instanciar el modelo
+# --- 2. LÓGICA DE ENTRENAMIENTO ---
+def entrenar_modelo_base():
+    """Entrena un modelo rápido si no existe uno guardado."""
+    INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE = 3, 16, 1
     modelo = RedNeuronal(INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE)
-    
-    # Definir la función de pérdida (qué tan mal lo está haciendo la red)
-    # Usamos MSELoss (Error Cuadrático Medio) para regresión
     criterio = nn.MSELoss()
+    optimizador = optim.Adam(modelo.parameters(), lr=0.01)
     
-    # Definir el optimizador (cómo ajustar los pesos de la red)
-    # Usamos Adam, que suele ser más rápido que SGD
-    optimizador = optim.Adam(modelo.parameters(), lr=LEARNING_RATE)
+    # Datos sintéticos rápidos
+    X = torch.randn(100, INPUT_SIZE)
+    y = X.sum(dim=1, keepdim=True)
     
-    # Obtener datos
-    entradas, objetivos = generar_datos_ejemplo()
+    for _ in range(500):
+        optimizador.zero_grad()
+        perdida = criterio(modelo(X), y)
+        perdida.backward()
+        optimizador.step()
     
-    # Ciclo de entrenamiento (Epochs)
-    for epoch in range(EPOCHS):
-        # A. Propagación hacia adelante (Forward pass)
-        predicciones = modelo(entradas)
-        
-        # B. Calcular la pérdida
-        perdida = criterio(predicciones, objetivos)
-        
-        # C. Propagación hacia atrás y optimización (Backward pass)
-        optimizador.zero_grad()  # Limpiar gradientes del paso anterior
-        perdida.backward()       # Calcular gradientes del error
-        optimizador.step()      # Ajustar los pesos
-        
-        # Imprimir progreso cada 100 épocas
-        if (epoch + 1) % 100 == 0:
-            print(f'Época [{epoch+1}/{EPOCHS}], Pérdida: {perdida.item():.4f}')
-            
-    print("\n--- Entrenamiento completado ---")
-    
-    # --- 5. GUARDAR EL MODELO ---
-    # Guardamos los pesos entrenados para usarlos después sin re-entrenar
-    torch.save(modelo.state_dict(), MODEL_NAME)
-    print(f"Modelo guardado como: {MODEL_NAME}")
-    
+    torch.save(modelo.state_dict(), "modelo_ia.pth")
     return modelo
 
+# --- 3. CONFIGURACIÓN DE LA INTERFAZ (ESTILO GEMINI) ---
+st.set_page_config(page_title="Mi IA Chat", page_icon="⚡", layout="centered")
 
-if __name__ == "__main__":
-    # Asegurar reproducibilidad
-    torch.manual_seed(42)
-    
-    # Entrenar y guardar
-    modelo_entrenado = entrenar()
-    
-    # Ejemplo rápido de uso (Inferencia)
-    print("\n--- Ejemplo de Inferencia con el modelo entrenado ---")
-    dato_nuevo = torch.tensor([[1.0, 2.0, 3.0]]) # Una nueva entrada
-    with torch.no_grad(): # Desactivar cálculo de gradientes para usar el modelo
-        prediccion = modelo_entrenado(dato_nuevo)
-    print(f"Para la entrada {dato_nuevo.tolist()[0]}, la IA predice: {prediccion.item():.4f}")
+# CSS para personalizar el estilo y que se vea más moderno
+st.markdown("""
+    <style>
+    .stApp { background-color: #0e1117; color: white; }
+    .stChatMessage { border-radius: 15px; margin-bottom: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("IA Neuronal Chat 🤖")
+st.caption("Interfaz impulsada por PyTorch y Streamlit")
+
+# --- 4. GESTIÓN DEL MODELO Y SESIÓN ---
+if "modelo" not in st.session_state:
+    if not os.path.exists("modelo_ia.pth"):
+        with st.spinner("Entrenando cerebro de la IA por primera vez..."):
+            st.session_state.modelo = entrenar_modelo_base()
+    else:
+        modelo = RedNeuronal()
+        modelo.load_state_dict(torch.load("modelo_ia.pth"))
+        modelo.eval()
+        st.session_state.modelo = modelo
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "¡Hola! Soy tu IA. Envíame 3 números separados por comas y predeciré el resultado."}
+    ]
+
+# --- 5. RENDERIZADO DEL CHAT ---
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Entrada del usuario
+if prompt := st.chat_input("Ejemplo: 0.5, 1.2, -0.8"):
+    # Mostrar mensaje del usuario
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Respuesta de la IA
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        full_res = ""
+        
+        try:
+            # Procesar entrada
+            nums = [float(x.strip()) for x in prompt.split(",")]
+            if len(nums) != 3:
+                respuesta = "Necesito exactamente **3 números** para procesar la información."
+            else:
+                # Inferencia
+                tensor_in = torch.tensor([nums], dtype=torch.float32)
+                with torch.no_grad():
+                    pred = st.session_state.modelo(tensor_in).item()
+                respuesta = f"Mi red neuronal procesó tus datos. El resultado estimado es: **{pred:.4f}**"
+        
+        except ValueError:
+            respuesta = "Por favor, asegúrate de enviar solo números separados por comas."
+
+        # Efecto de escritura
+        for palabra in respuesta.split():
+            full_res += palabra + " "
+            time.sleep(0.08)
+            placeholder.markdown(full_res + "▌")
+        placeholder.markdown(full_res)
+
+    st.session_state.messages.append({"role": "assistant", "content": full_res})
